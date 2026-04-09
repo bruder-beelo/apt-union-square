@@ -22,27 +22,56 @@ jobs:
       - name: Check apartment availability
         id: check
         run: |
-          python check_availability.py
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
-        continue-on-error: true
+          python check_availability.py > output.txt 2>&1 || true
+          cat output.txt
+          if grep -q "✅ Found" output.txt; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Send email notification if available
-        if: steps.check.outputs.exit_code == '0'
-        uses: dawidd6/action-send-mail@v3
+      - name: Create Issue if apartment available
+        if: steps.check.outputs.available == 'true'
+        uses: actions/github-script@v7
         with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: '🏠 1 Bedroom Apartment Available at Union 346!'
-          to: ${{ secrets.NOTIFICATION_EMAIL }}
-          from: Union 346 Apartment Checker
-          body: |
-            Great news! A 1 bedroom apartment is now available at Union 346.
+          script: |
+            const title = '🏠 1 Bedroom Apartment Available at Union 346!';
+            const body = `## Great news! A 1 bedroom apartment is now available! 🎉
 
-            Check the GitHub Actions run for details:
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            **Action Required:** Check the apartment details and apply ASAP!
 
-            Visit the website:
-            https://www.union346.com/floorplans
-          priority: high
+            ### Links
+            - 🏢 [View Floorplans](https://www.union346.com/floorplans)
+            - 📊 [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### Next Steps
+            1. Visit the Union 346 website
+            2. Review the available 1 bedroom unit
+            3. Contact them to schedule a tour
+            4. Apply if interested!
+
+            ---
+            *This issue was automatically created by the apartment availability checker.*
+            *Generated at: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}*`;
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'apartment-available'
+            });
+
+            if (issues.data.length === 0) {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['apartment-available', 'alert']
+              });
+              console.log('✅ Created new issue for available apartment');
+            } else {
+              console.log('ℹ️ Issue already exists - not creating duplicate');
+            }
