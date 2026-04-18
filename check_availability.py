@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check for 1 bedroom apartment availability at Union 346.
+Check for 1 bedroom or 1 bedroom + den apartment availability at Union 346.
 Exit code 0 if available, 1 if not available.
 """
 import gzip
@@ -11,7 +11,7 @@ import urllib.request
 API_URL = "https://sightmap.com/app/api/v1/rkwnqjo8wd2/sightmaps/45000"
 
 def check_one_bedroom_availability():
-    """Check if any 1 bedroom apartments are available."""
+    """Check if any 1 bedroom or 1 bed + den apartments are available."""
     try:
         # Make API request with compression headers
         req = urllib.request.Request(
@@ -33,31 +33,45 @@ def check_one_bedroom_availability():
         units = data.get('data', {}).get('units', [])
         floor_plans = data.get('data', {}).get('floor_plans', [])
 
-        # Create a map of floor_plan_id to bedroom_count
+        # Create a map of floor_plan_id to floor plan details
         floor_plan_map = {
-            fp['id']: fp.get('bedroom_count', -1)
+            fp['id']: {
+                'bedroom_count': fp.get('bedroom_count', -1),
+                'filter_label': fp.get('filter_label', ''),
+                'name': fp.get('name', '')
+            }
             for fp in floor_plans
         }
 
-        # Check if any available unit is a 1 bedroom
-        one_bedroom_units = []
+        # Check if any available unit is a 1 bedroom or 1 bed + den
+        target_units = []
         for unit in units:
             floor_plan_id = unit.get('floor_plan_id')
-            if floor_plan_id and floor_plan_map.get(floor_plan_id) == 1:
-                one_bedroom_units.append({
-                    'unit_number': unit.get('display_unit_number', 'Unknown'),
-                    'price': unit.get('display_price', 'N/A'),
-                    'available_on': unit.get('display_available_on', 'N/A')
-                })
+            if floor_plan_id:
+                fp_info = floor_plan_map.get(floor_plan_id, {})
+                bedroom_count = fp_info.get('bedroom_count', -1)
+                filter_label = fp_info.get('filter_label', '').lower()
 
-        if one_bedroom_units:
-            print(f"✅ Found {len(one_bedroom_units)} one-bedroom apartment(s) available!")
+                # Match: bedroom_count == 1 OR filter_label contains "bed" and "den"
+                is_one_bedroom = bedroom_count == 1
+                is_den = 'den' in filter_label and 'bed' in filter_label
+
+                if is_one_bedroom or is_den:
+                    target_units.append({
+                        'unit_number': unit.get('display_unit_number', 'Unknown'),
+                        'price': unit.get('display_price', 'N/A'),
+                        'available_on': unit.get('display_available_on', 'N/A'),
+                        'type': fp_info.get('filter_label', 'Unknown')
+                    })
+
+        if target_units:
+            print(f"✅ Found {len(target_units)} one-bedroom apartment(s) available!")
             print("\nDetails:")
-            for unit in one_bedroom_units:
-                print(f"  • {unit['unit_number']} - {unit['price']} - {unit['available_on']}")
+            for unit in target_units:
+                print(f"  • {unit['unit_number']} ({unit['type']}) - {unit['price']} - {unit['available_on']}")
             return True
         else:
-            print("❌ No one-bedroom apartments available.")
+            print("❌ No one-bedroom or one-bedroom + den apartments available.")
             print(f"Total available units: {len(units)} (all other types)")
             return False
 
