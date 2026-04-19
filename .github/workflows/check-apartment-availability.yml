@@ -77,29 +77,33 @@ jobs:
               }
 
               const title = `🏠 ${unitId} Available - ${unit.type}`;
-              const body = `## Great news! A 1 bedroom apartment is now available! 🎉
+              const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
 
-**Unit Details:**
-- **Unit Number:** ${unitId}
-- **Type:** ${unit.type}
-- **Price:** ${unit.price}
-- **Available:** ${unit.available_on}
-
-**Action Required:** Check the apartment details and apply ASAP!
-
-### Links
-- 🏢 [View Floorplans](https://www.union346.com/floorplans)
-- 📊 [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-### Next Steps
-1. Visit the Union 346 website
-2. Review unit ${unitId}
-3. Contact them to schedule a tour
-4. Apply if interested!
-
----
-*This issue was automatically created by the apartment availability checker.*
-*Generated at: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}*`;
+              const body = [
+                '## Great news! A 1 bedroom apartment is now available! 🎉',
+                '',
+                '**Unit Details:**',
+                `- **Unit Number:** ${unitId}`,
+                `- **Type:** ${unit.type}`,
+                `- **Price:** ${unit.price}`,
+                `- **Available:** ${unit.available_on}`,
+                '',
+                '**Action Required:** Check the apartment details and apply ASAP!',
+                '',
+                '### Links',
+                '- 🏢 [View Floorplans](https://www.union346.com/floorplans)',
+                '- 📊 [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})',
+                '',
+                '### Next Steps',
+                '1. Visit the Union 346 website',
+                `2. Review unit ${unitId}`,
+                '3. Contact them to schedule a tour',
+                '4. Apply if interested!',
+                '',
+                '---',
+                '*This issue was automatically created by the apartment availability checker.*',
+                `*Generated at: ${timestamp}*`
+              ].join('\n');
 
               await github.rest.issues.create({
                 owner: context.repo.owner,
