@@ -33,48 +33,81 @@ jobs:
             echo "available=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Issue if apartment available
+      - name: Create Issues for each available apartment
         if: steps.check.outputs.available == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const title = '🏠 1 Bedroom Apartment Available at Union 346!';
-            const body = `## Great news! A 1 bedroom apartment is now available! 🎉
+            const fs = require('fs');
+            const output = fs.readFileSync('output.txt', 'utf8');
 
-            **Action Required:** Check the apartment details and apply ASAP!
+            // Extract JSON from output
+            const jsonMatch = output.match(/__UNITS_JSON__\n(.*?)\n__END_JSON__/s);
+            if (!jsonMatch) {
+              console.log('⚠️ Could not parse units JSON from output');
+              return;
+            }
 
-            ### Links
-            - 🏢 [View Floorplans](https://www.union346.com/floorplans)
-            - 📊 [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            const units = JSON.parse(jsonMatch[1]);
+            console.log(`Found ${units.length} available unit(s)`);
 
-            ### Next Steps
-            1. Visit the Union 346 website
-            2. Review the available 1 bedroom unit
-            3. Contact them to schedule a tour
-            4. Apply if interested!
-
-            ---
-            *This issue was automatically created by the apartment availability checker.*
-            *Generated at: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}*`;
-
-            // Check if issue already exists
-            const issues = await github.rest.issues.listForRepo({
+            // Get all existing open issues with apartment-available label
+            const existingIssues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'apartment-available'
             });
 
-            if (issues.data.length === 0) {
-              // Create new issue
+            // Extract unit numbers from existing issue titles
+            const existingUnitNumbers = existingIssues.data.map(issue => {
+              const match = issue.title.match(/UNIT\s+[\w-]+/);
+              return match ? match[0] : null;
+            }).filter(Boolean);
+
+            console.log(`Existing issues for units: ${existingUnitNumbers.join(', ') || 'none'}`);
+
+            // Create an issue for each unit that doesn't have one
+            for (const unit of units) {
+              const unitId = unit.unit_number;
+
+              if (existingUnitNumbers.includes(unitId)) {
+                console.log(`ℹ️ Issue already exists for ${unitId} - skipping`);
+                continue;
+              }
+
+              const title = `🏠 ${unitId} Available - ${unit.type}`;
+              const body = `## Great news! A 1 bedroom apartment is now available! 🎉
+
+**Unit Details:**
+- **Unit Number:** ${unitId}
+- **Type:** ${unit.type}
+- **Price:** ${unit.price}
+- **Available:** ${unit.available_on}
+
+**Action Required:** Check the apartment details and apply ASAP!
+
+### Links
+- 🏢 [View Floorplans](https://www.union346.com/floorplans)
+- 📊 [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+### Next Steps
+1. Visit the Union 346 website
+2. Review unit ${unitId}
+3. Contact them to schedule a tour
+4. Apply if interested!
+
+---
+*This issue was automatically created by the apartment availability checker.*
+*Generated at: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}*`;
+
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: title,
                 body: body,
-                labels: ['apartment-available', 'alert']
+                labels: ['apartment-available', 'alert', unitId]
               });
-              console.log('✅ Created new issue for available apartment');
-            } else {
-              console.log('ℹ️ Issue already exists - not creating duplicate');
+
+              console.log(`✅ Created issue for ${unitId}`);
             }

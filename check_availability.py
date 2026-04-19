@@ -69,6 +69,11 @@ def check_one_bedroom_availability():
             print("\nDetails:")
             for unit in target_units:
                 print(f"  • {unit['unit_number']} ({unit['type']}) - {unit['price']} - {unit['available_on']}")
+
+            # Output JSON for GitHub Actions to parse
+            print("\n__UNITS_JSON__")
+            print(json.dumps(target_units))
+            print("__END_JSON__")
             return True
         else:
             print("❌ No one-bedroom or one-bedroom + den apartments available.")
